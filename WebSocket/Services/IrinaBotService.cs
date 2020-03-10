@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Websocket.Client;
 using Websocket.Client.Models;
@@ -93,7 +94,6 @@ namespace WebSocket.Services
 
             for (int i = 0; i < gameCount; i++)
             {
-                var game = new GameModel();
                 stream.Read(out sbyte started);
                 stream.Read(out string name);
                 stream.Read(out sbyte hasAdmin);
@@ -105,38 +105,43 @@ namespace WebSocket.Services
                 stream.Read(out sbyte slotflsg);
                 stream.Read(out sbyte maxPlayers);
                 stream.Read(out sbyte playersCount);
-                game.Started = started;
-                game.Name = name;
-                game.GameCounter = gameCounter;
-                game.GameTicks = gameTicks;
-                game.HasAdmin = hasAdmin;
-                game.HasGamePowerUp = hasGamePowerUp;
-                game.HasPassword = hasPassword;
-                game.IccupHost = iccupHost;
-                game.MaxPlayers = maxPlayers;
-                game.PlayersCount = playersCount;
-                game.Slotflsg = slotflsg;
+                var game = new GameModel
+                {
+                    Started = started,
+                    Name = name,
+                    GameCounter = gameCounter,
+                    GameTicks = gameTicks,
+                    HasAdmin = hasAdmin,
+                    HasGamePowerUp = hasGamePowerUp,
+                    HasPassword = hasPassword,
+                    IccupHost = iccupHost,
+                    MaxPlayers = maxPlayers,
+                    PlayersCount = playersCount,
+                    Slotflsg = slotflsg,
+                    Players = new List<GamePlayerModel>()
+                };
 
-                game.Players = new List<GamePlayerModel>();
 
                 for (int j = 0; j < playersCount; j++)
                 {
-                    var player = new GamePlayerModel();
                     stream.Read(out sbyte color);
                     stream.Read(out string pName);
                     stream.Read(out string relam);
                     stream.Read(out string comment);
-                    player.Color = color;
-                    player.Comment = comment;
-                    player.Name = pName;
-                    player.Relam = relam;
+                    var player = new GamePlayerModel
+                    {
+                        Color = color, 
+                        Comment = comment,
+                        Name = pName, 
+                        Relam = relam
+                    };
 
                     game.Players.Add(player);
                 }
                 gameList.Add(game);
             }
 
-            foreach (var game in gameList)
+            foreach (var game in gameList.Where(x => x.Started == 0))
             {
                 Console.WriteLine("Game:" + game.Name);
                 Console.WriteLine("Started:" + game.Started);
