@@ -114,7 +114,7 @@ namespace WebSocket
                 gameList.Add(game);
             }
 
-            foreach (var game in gameList.Where(x => x.Started == 0))
+            foreach (var game in gameList.Where(x => x.Started == 1))
             {
                 Console.WriteLine("Game:" + game.Name);
                 Console.WriteLine("Started:" + game.Started);
@@ -123,7 +123,7 @@ namespace WebSocket
                 Console.WriteLine("Counter:" + game.GameCounter);
                 foreach (var player in game.Players)
                 {
-                    Console.WriteLine("\tPlayer: " + player.Name);
+                    Console.WriteLine("\tPlayer: " + player.Name + " color: " + player.Color);
                 }
             }
 

@@ -1,12 +1,14 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace WebSocket.Utils
 {
     /// <summary>
-    /// Enumerator that represents the size of each datatype supported by the BufferStream class.
+    /// Enumerator that represents the size of each data type supported by the BufferStream class.
     /// </summary>
+    [SuppressMessage("ReSharper", "UnusedMember.Global")]
     public enum BufferTypeSize
     {
         None = 0, Bool = 1, Byte = 1, SByte = 1,
@@ -17,25 +19,30 @@ namespace WebSocket.Utils
     /// <summary>
     /// Provides a stream designed for reading TCP packets and UDP datagrams by type.
     /// </summary>
+    [SuppressMessage("ReSharper", "UnusedMember.Global")]
+    [SuppressMessage("ReSharper", "ForCanBeConvertedToForeach")]
     public class BufferStream
     {
-        private const byte bTrue = 1, bFalse = 0;
-        private int fastAlign, fastAlignNot;
-        private int iterator, length, alignment;
-        private byte[] memory;
+        private const byte BTrue = 1, BFalse = 0;
+        private readonly int _fastAlign;
+        private readonly int _fastAlignNot;
+        private int _iterator, _length, _alignment;
+        private byte[] _memory;
 
         /// <summary>
         /// Gets the underlying array of memory for this BufferStream.
         /// </summary>
-        public byte[] Memory { get { return memory; } }
+        public byte[] Memory => _memory;
+
         /// <summary>
         /// Gets the length of the buffer in bytes.
         /// </summary>
-        public int Length { get { return length; } }
+        public int Length => _length;
+
         /// <summary>
         /// Gets the current iterator(read/write position) for this BufferStream.
         /// </summary>
-        public int Iterator { get { return iterator; } }
+        public int Iterator => _iterator;
 
         /// <summary>
         /// Instantiates an instance of the BufferStream class with the specified stream length and alignment.
@@ -44,12 +51,12 @@ namespace WebSocket.Utils
         /// <param name="alignment">Alignment of the BufferStream in bytes.</param>
         public BufferStream(int length, int alignment)
         {
-            fastAlign = alignment - 1;
-            fastAlignNot = ~fastAlign;
-            this.length = length;
-            this.alignment = alignment;
-            memory = new byte[AlignedIterator(length, alignment)];
-            iterator = 0;
+            _fastAlign = alignment - 1;
+            _fastAlignNot = ~_fastAlign;
+            this._length = length;
+            this._alignment = alignment;
+            _memory = new byte[AlignedIterator(length, alignment)];
+            _iterator = 0;
         }
 
         /// <summary>
@@ -69,14 +76,14 @@ namespace WebSocket.Utils
         /// </summary>
         /// <param name="iterator">Read/write position.</param>
         /// <param name="length">Index to check the bounds of.</param>
-        /// <param name="alignment">Size in bytes to align the iterator too.</param>
+        /// <param name="align"></param>
         /// <returns></returns>
         [MethodImpl(256)]
         public bool IsWithinMemoryBounds(int iterator, int length, bool align = true)
         {
-            int iterBegin = (align) ? ((iterator + fastAlign) & fastAlignNot) : iterator;
-            int iterEnd = iterBegin + length;
-            return (iterBegin < 0 || iterEnd >= length);
+            int iteratorBegin = (align) ? ((iterator + _fastAlign) & _fastAlignNot) : iterator;
+            int iteratorEnd = iteratorBegin + length;
+            return (iteratorBegin < 0 || iteratorEnd >= length);
         }
 
         /// <summary>
@@ -86,11 +93,11 @@ namespace WebSocket.Utils
         /// <param name="alignment">Alignment in bytes to align the block of memory too.</param>
         public void Allocate(int length, int alignment)
         {
-            if (memory != null) Deallocate();
+            if (_memory != null) Deallocate();
 
-            memory = new byte[AlignedIterator(length, alignment)];
-            this.alignment = alignment;
-            this.length = length;
+            _memory = new byte[AlignedIterator(length, alignment)];
+            this._alignment = alignment;
+            this._length = length;
         }
 
         /// <summary>
@@ -98,13 +105,13 @@ namespace WebSocket.Utils
         /// </summary>
         public void Deallocate()
         {
-            memory = null;
-            iterator = 0;
+            _memory = null;
+            _iterator = 0;
         }
 
         public void ReassignMemory(byte[] mem)
         {
-            memory = mem;
+            _memory = mem;
         }
 
         /// <summary>
@@ -113,7 +120,7 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentNullException"/>
         public void ZeroMemory()
         {
-            Array.Clear(memory, 0, memory.Length);
+            Array.Clear(_memory, 0, _memory.Length);
         }
 
         /// <summary>
@@ -122,7 +129,7 @@ namespace WebSocket.Utils
         /// <param name="value">The value to zero the memory too.</param>
         public void ZeroMemory(byte value)
         {
-            for (int i = 0; i++ < memory.Length;) memory[i] = value;
+            for (int i = 0; i++ < _memory.Length;) _memory[i] = value;
         }
 
         /// <summary>
@@ -132,9 +139,9 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentNullException"/>
         public BufferStream CloneBufferStream()
         {
-            BufferStream clone = new BufferStream(memory.Length, alignment);
-            Array.Copy(memory, clone.Memory, memory.Length);
-            clone.iterator = iterator;
+            BufferStream clone = new BufferStream(_memory.Length, _alignment);
+            Array.Copy(_memory, clone.Memory, _memory.Length);
+            clone._iterator = _iterator;
             return clone;
         }
 
@@ -142,15 +149,15 @@ namespace WebSocket.Utils
         /// Copies the specified number of bytes from this buffer to the destination buffer, given the start position(s) in each buffer.
         /// </summary>
         /// <param name="destBuffer">Buffer to copy the contents of this buffer too.</param>
-        /// <param name="srceIndex">Start position to begin copying the data from in this buffer.</param>
+        /// <param name="sourceIndex">Start position to begin copying the data from in this buffer.</param>
         /// <param name="destIndex">Start position to begin copying the data to in the destination buffer.</param>
         /// <param name="length">Number of bytes to copy from this buffer to the destination buffer.</param>
         /// <exception cref="System.ArgumentNullException"/>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <exception cref="System.ArgumentException"/>
-        public void BlockCopy(BufferStream destBuffer, int srceIndex, int destIndex, int length)
+        public void BlockCopy(BufferStream destBuffer, int sourceIndex, int destIndex, int length)
         {
-            Array.Copy(memory, srceIndex, destBuffer.Memory, destIndex, length);
+            Array.Copy(_memory, sourceIndex, destBuffer.Memory, destIndex, length);
         }
 
         /// <summary>
@@ -164,7 +171,7 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentException"/>
         public void BlockCopy(BufferStream destBuffer, int startIndex, int length)
         {
-            Array.Copy(memory, startIndex, destBuffer.Memory, startIndex, length);
+            Array.Copy(_memory, startIndex, destBuffer.Memory, startIndex, length);
         }
 
         /// <summary>
@@ -177,7 +184,7 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentException"/>
         public void BlockCopy(BufferStream destBuffer, int length)
         {
-            Array.Copy(memory, destBuffer.Memory, length);
+            Array.Copy(_memory, destBuffer.Memory, length);
         }
 
         /// <summary>
@@ -186,8 +193,8 @@ namespace WebSocket.Utils
         /// <param name="destBuffer">Buffer to copy the contents of this buffer too.</param>
         public void BlockCopy(BufferStream destBuffer)
         {
-            int length = (destBuffer.Memory.Length > memory.Length) ? memory.Length : destBuffer.Memory.Length;
-            Array.Copy(memory, destBuffer.Memory, length);
+            int length = (destBuffer.Memory.Length > _memory.Length) ? _memory.Length : destBuffer.Memory.Length;
+            Array.Copy(_memory, destBuffer.Memory, length);
         }
 
         /// <summary>
@@ -196,8 +203,8 @@ namespace WebSocket.Utils
         /// <param name="size">Size in bytes of the resized block of memory.</param>
         public void ResizeBuffer(int size)
         {
-            Array.Resize<byte>(ref memory, size);
-            length = memory.Length;
+            Array.Resize(ref _memory, size);
+            _length = _memory.Length;
         }
 
         /// <summary>
@@ -207,8 +214,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(bool value)
         {
-            memory[iterator++] = (value) ? bTrue : bFalse;
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            _memory[_iterator++] = (value) ? BTrue : BFalse;
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -218,8 +225,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(byte value)
         {
-            memory[iterator++] = value;
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            _memory[_iterator++] = value;
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -229,8 +236,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(sbyte value)
         {
-            memory[iterator++] = (byte)value;
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            _memory[_iterator++] = (byte)value;
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -240,9 +247,9 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(ushort value)
         {
-            memory[iterator++] = (byte)value;
-            memory[iterator++] = (byte)(value >> 8);
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            _memory[_iterator++] = (byte)value;
+            _memory[_iterator++] = (byte)(value >> 8);
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -252,9 +259,9 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(short value)
         {
-            memory[iterator++] = (byte)value;
-            memory[iterator++] = (byte)(value >> 8);
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            _memory[_iterator++] = (byte)value;
+            _memory[_iterator++] = (byte)(value >> 8);
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -264,11 +271,11 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(uint value)
         {
-            memory[iterator++] = (byte)value;
-            memory[iterator++] = (byte)(value >> 8);
-            memory[iterator++] = (byte)(value >> 16);
-            memory[iterator++] = (byte)(value >> 24);
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            _memory[_iterator++] = (byte)value;
+            _memory[_iterator++] = (byte)(value >> 8);
+            _memory[_iterator++] = (byte)(value >> 16);
+            _memory[_iterator++] = (byte)(value >> 24);
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -278,11 +285,11 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(int value)
         {
-            memory[iterator++] = (byte)value;
-            memory[iterator++] = (byte)(value >> 8);
-            memory[iterator++] = (byte)(value >> 16);
-            memory[iterator++] = (byte)(value >> 24);
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            _memory[_iterator++] = (byte)value;
+            _memory[_iterator++] = (byte)(value >> 8);
+            _memory[_iterator++] = (byte)(value >> 16);
+            _memory[_iterator++] = (byte)(value >> 24);
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -293,8 +300,8 @@ namespace WebSocket.Utils
         public void Write(float value)
         {
             byte[] bytes = BitConverter.GetBytes(value);
-            for (int i = 0; i < bytes.Length; i++) memory[iterator++] = bytes[i];
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            for (int i = 0; i < bytes.Length; i++) _memory[_iterator++] = bytes[i];
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -305,8 +312,8 @@ namespace WebSocket.Utils
         public void Write(double value)
         {
             byte[] bytes = BitConverter.GetBytes(value);
-            for (int i = 0; i < bytes.Length; i++) memory[iterator++] = bytes[i];
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            for (int i = 0; i < bytes.Length; i++) _memory[_iterator++] = bytes[i];
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -317,9 +324,9 @@ namespace WebSocket.Utils
         public void Write(string value)
         {
             var bytes = Encoding.ASCII.GetBytes(value);
-            for (var i = 0; i < bytes.Length; i++) { memory[iterator++] = bytes[i]; }
-            memory[iterator++] = 0;
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            for (var i = 0; i < bytes.Length; i++) { _memory[_iterator++] = bytes[i]; }
+            _memory[_iterator++] = 0;
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -329,8 +336,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Write(byte[] value)
         {
-            for (int i = 0; i < value.Length; i++) memory[iterator++] = value[i];
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            for (int i = 0; i < value.Length; i++) _memory[_iterator++] = value[i];
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -340,8 +347,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Read(out bool value)
         {
-            value = memory[iterator++] > 0;
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            value = _memory[_iterator++] > 0;
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -351,8 +358,8 @@ namespace WebSocket.Utils
         /// /// <exception cref="System.IndexOutOfRangeException"/>
         public void Read(out byte value)
         {
-            value = memory[iterator++];
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            value = _memory[_iterator++];
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -362,8 +369,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.IndexOutOfRangeException"/>
         public void Read(out sbyte value)
         {
-            value = (sbyte)memory[iterator++];
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            value = (sbyte)_memory[_iterator++];
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
 
@@ -376,8 +383,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out ushort value)
         {
-            value = BitConverter.ToUInt16(memory, iterator);
-            iterator = (iterator + (int)BufferTypeSize.UInt16 + fastAlign) & fastAlignNot;
+            value = BitConverter.ToUInt16(_memory, _iterator);
+            _iterator = (_iterator + (int)BufferTypeSize.UInt16 + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -389,8 +396,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out short value)
         {
-            value = BitConverter.ToInt16(memory, iterator);
-            iterator = (iterator + (int)BufferTypeSize.Int16 + fastAlign) & fastAlignNot;
+            value = BitConverter.ToInt16(_memory, _iterator);
+            _iterator = (_iterator + (int)BufferTypeSize.Int16 + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -402,8 +409,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out uint value)
         {
-            value = BitConverter.ToUInt32(memory, iterator);
-            iterator = (iterator + (int)BufferTypeSize.Int32 + fastAlign) & fastAlignNot;
+            value = BitConverter.ToUInt32(_memory, _iterator);
+            _iterator = (_iterator + (int)BufferTypeSize.Int32 + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -415,8 +422,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out int value)
         {
-            value = BitConverter.ToInt32(memory, iterator);
-            iterator = (iterator + (int)BufferTypeSize.Int32 + fastAlign) & fastAlignNot;
+            value = BitConverter.ToInt32(_memory, _iterator);
+            _iterator = (_iterator + (int)BufferTypeSize.Int32 + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -428,8 +435,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out float value)
         {
-            value = BitConverter.ToSingle(memory, iterator);
-            iterator = (iterator + (int)BufferTypeSize.Single + fastAlign) & fastAlignNot;
+            value = BitConverter.ToSingle(_memory, _iterator);
+            _iterator = (_iterator + (int)BufferTypeSize.Single + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -441,8 +448,8 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out double value)
         {
-            value = BitConverter.ToUInt16(memory, iterator);
-            iterator = (iterator + (int)BufferTypeSize.Double + fastAlign) & fastAlignNot;
+            value = BitConverter.ToUInt16(_memory, _iterator);
+            _iterator = (_iterator + (int)BufferTypeSize.Double + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -455,17 +462,17 @@ namespace WebSocket.Utils
         public void Read(out string value)
         {
             int index = 1;
-            int startIt = iterator;
+            int startIt = _iterator;
 
-            for (char c = '\0'; iterator < length;)
+            for (char c; _iterator < _length;)
             {
-                c = (char)memory[iterator++];
+                c = (char)_memory[_iterator++];
                 index++;
                 if (c == '\0') break;
             }
 
-            value = Encoding.UTF8.GetString(memory, startIt, index - 1);
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            value = Encoding.UTF8.GetString(_memory, startIt, index - 1);
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -479,8 +486,8 @@ namespace WebSocket.Utils
         public void Read(out byte[] value, int length)
         {
             value = new byte[length];
-            for (int i = 0; i < length; i++) value[i] = memory[iterator++];
-            iterator = (iterator + fastAlign) & fastAlignNot;
+            for (int i = 0; i < length; i++) value[i] = _memory[_iterator++];
+            _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -489,7 +496,7 @@ namespace WebSocket.Utils
         /// <param name="iterator">Index to set the iterator to.</param>
         public void Seek(int iterator)
         {
-            this.iterator = (iterator + fastAlign) & fastAlignNot;
+            this._iterator = (iterator + _fastAlign) & _fastAlignNot;
         }
 
         /// <summary>
@@ -497,9 +504,9 @@ namespace WebSocket.Utils
         /// </summary>
         /// <param name="iterator">Index to set the iterator to.</param>
         /// <param name="align">Whether to align the iterator or not.</param>
-        public void Seek(int iterator, bool align = false)
+        public void Seek(int iterator, bool align)
         {
-            this.iterator = (align) ? (iterator + fastAlign) & fastAlignNot : iterator;
+            this._iterator = (align) ? (iterator + _fastAlign) & _fastAlignNot : iterator;
         }
     }
 }
