@@ -27,9 +27,35 @@ namespace WebSocket
             {
                 irka.AddHandler(DefaultContext.NewMessage, HandleMessage);
                 irka.AddHandler(DefaultContext.GameList, HandleGameList);
+                irka.AddHandler(DefaultContext.WebSocketConnect, HandlePing);
+
+                irka.AddTask(GetGameList, 2000);
+                irka.AddTask(Ping, 2000);
 
                 irka.Start();
             }
+        }
+
+        private bool GetGameList(WebsocketClient client)
+        {
+            client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetGameList });
+
+            return true;
+        }
+
+        private bool Ping(WebsocketClient client)
+        {
+            client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetWebsocketConnect });
+
+            return true;
+        }
+
+        private Dictionary<string, object> HandlePing(BufferStream stream, WebsocketClient client)
+        {
+            stream.Read(out int totalUsers);
+            Console.WriteLine("Total users: " + totalUsers);
+
+            return new Dictionary<string, object>();
         }
 
         private Dictionary<string, object> HandleMessage(BufferStream stream, WebsocketClient client)

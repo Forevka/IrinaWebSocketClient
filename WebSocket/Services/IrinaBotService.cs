@@ -17,10 +17,14 @@ namespace WebSocket.Services
         private readonly Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>> _handlersDefaultContext;
         private readonly Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>> _handlersGlobalContext;
 
+        private readonly List<Thread> _tasks;
+
         public IrinaBotService(string webSocketUrl)
         {
             _client = new WebsocketClient(new Uri(webSocketUrl));
             _resetEvent = new ManualResetEvent(false);
+
+            _tasks = new List<Thread>();
 
             _handlersDefaultContext = new Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>>();
             _handlersGlobalContext = new Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>>();
@@ -28,6 +32,22 @@ namespace WebSocket.Services
             _client.ReconnectTimeout = TimeSpan.FromSeconds(30);
             _client.ReconnectionHappened.Subscribe(ReconnectHandler);
             _client.MessageReceived.Subscribe(Dispatch);
+        }
+
+        public void AddTask(Func<WebsocketClient, bool> task, int sleepTime)
+        {
+            var thread = new Thread(() => Task(task, sleepTime));
+            thread.Start();
+            _tasks.Add(thread);
+        }
+
+        public bool Task(Func<WebsocketClient, bool> task, int sleepTime)
+        {
+            while (true)
+            {
+                Thread.Sleep(sleepTime);
+                task.Invoke(_client);
+            }
         }
 
         public void AddHandler(DefaultContext contextHeader, Func<BufferStream, WebsocketClient, Dictionary<string, object>> handler)
@@ -54,7 +74,7 @@ namespace WebSocket.Services
 
         public void Start()
         {
-            _client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetGameList });
+            //_client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetGameList });
 
             _client.Start();
 
@@ -63,7 +83,7 @@ namespace WebSocket.Services
 
         private void Dispatch(ResponseMessage msg)
         {
-            Console.WriteLine(msg.ToString());
+            //Console.WriteLine(msg.ToString());
             BufferStream stream = new BufferStream(msg.Binary.Length, 1);
             stream.ReassignMemory(msg.Binary);
 
