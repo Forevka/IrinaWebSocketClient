@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using WebSocket.Abstractions;
 using Websocket.Client;
 using WebSocket.Enums;
 using WebSocket.Models;
@@ -11,6 +10,19 @@ using WebSocket.Utils;
 
 namespace WebSocket
 {
+    public static class IrinaExtensions 
+    {
+        public static void GetMapInfo(this IrinaBotService client, int gameId)
+        {
+            var buffer = new BufferStream(7, 1);
+            buffer.Write((byte)ContextType.DefaultContext);
+            buffer.Write((byte)DefaultContext.GetMapInfo);
+            buffer.Write(gameId);
+
+            client.Send(buffer);
+        }
+    }
+
     class Program
     {
         static void Main()
@@ -23,17 +35,31 @@ namespace WebSocket
         {
             Console.OutputEncoding = Encoding.UTF8;
 
-            using (IIrinaBotService irka = new IrinaBotService("wss://irinabot.ru/ghost/"))
+            using (IrinaBotService irka = new IrinaBotService("wss://irinabot.ru/ghost/"))
             {
                 irka.AddHandler(DefaultContext.NewMessage, HandleMessage);
                 irka.AddHandler(DefaultContext.GameList, HandleGameList);
                 irka.AddHandler(DefaultContext.WebSocketConnect, HandlePing);
+                irka.AddHandler(DefaultContext.MapInfo, HandleMapInfo);
+
+                irka.GetMapInfo(13682);
 
                 irka.AddTask(GetGameList, 2000);
                 irka.AddTask(Ping, 2000);
 
                 irka.Start();
             }
+        }
+
+        private Dictionary<string, object> HandleMapInfo(BufferStream stream, WebsocketClient client)
+        {
+            var map = new GameMapModel(stream);
+
+            map.SavePicture(map.Author + "___" + map.Name + ".tga");
+
+            Console.WriteLine("Map: " + map.Name + "Author: " + map.Author);
+            
+            return new Dictionary<string, object>();
         }
 
         private bool GetGameList(WebsocketClient client)
@@ -93,50 +119,8 @@ namespace WebSocket
 
             for (int i = 0; i < gameCount; i++)
             {
-                stream.Read(out sbyte started);
-                stream.Read(out string name);
-                stream.Read(out sbyte hasAdmin);
-                stream.Read(out sbyte hasPassword);
-                stream.Read(out sbyte hasGamePowerUp);
-                stream.Read(out int gameCounter);
-                stream.Read(out int gameTicks);
-                stream.Read(out string iccupHost);
-                stream.Read(out sbyte slotflsg);
-                stream.Read(out sbyte maxPlayers);
-                stream.Read(out sbyte playersCount);
-                var game = new GameModel
-                {
-                    Started = started,
-                    Name = name,
-                    GameCounter = gameCounter,
-                    GameTicks = gameTicks,
-                    HasAdmin = hasAdmin,
-                    HasGamePowerUp = hasGamePowerUp,
-                    HasPassword = hasPassword,
-                    IccupHost = iccupHost,
-                    MaxPlayers = maxPlayers,
-                    PlayersCount = playersCount,
-                    Slotflsg = slotflsg,
-                    Players = new List<GamePlayerModel>()
-                };
+                var game = new GameModel(stream);
 
-
-                for (int j = 0; j < playersCount; j++)
-                {
-                    stream.Read(out sbyte color);
-                    stream.Read(out string pName);
-                    stream.Read(out string relam);
-                    stream.Read(out string comment);
-                    var player = new GamePlayerModel
-                    {
-                        Color = color,
-                        Comment = comment,
-                        Name = pName,
-                        Relam = relam
-                    };
-
-                    game.Players.Add(player);
-                }
                 gameList.Add(game);
             }
 

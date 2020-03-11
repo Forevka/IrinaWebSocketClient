@@ -44,6 +44,7 @@ namespace WebSocket.Utils
         /// </summary>
         public int Iterator => _iterator;
 
+
         /// <summary>
         /// Instantiates an instance of the BufferStream class with the specified stream length and alignment.
         /// </summary>
@@ -373,7 +374,6 @@ namespace WebSocket.Utils
             _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 
-
         /// <summary>
         /// Reads the value of the specified type from the buffer.
         /// </summary>
@@ -461,17 +461,17 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out string value)
         {
-            int index = 1;
+            int index = 0;
             int startIt = _iterator;
 
             for (char c; _iterator < _length;)
             {
                 c = (char)_memory[_iterator++];
-                index++;
                 if (c == '\0') break;
+                index++;
             }
 
-            value = Encoding.UTF8.GetString(_memory, startIt, index - 1);
+            value = Encoding.UTF8.GetString(_memory, startIt, index);
             _iterator = (_iterator + _fastAlign) & _fastAlignNot;
         }
 

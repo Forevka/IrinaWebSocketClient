@@ -9,7 +9,7 @@ using WebSocket.Utils;
 
 namespace WebSocket.Services
 {
-    class IrinaBotService: IIrinaBotService
+    public class IrinaBotService: IIrinaBotService
     {
         private readonly WebsocketClient _client;
         private readonly ManualResetEvent _resetEvent;
@@ -32,6 +32,11 @@ namespace WebSocket.Services
             _client.ReconnectTimeout = TimeSpan.FromSeconds(30);
             _client.ReconnectionHappened.Subscribe(ReconnectHandler);
             _client.MessageReceived.Subscribe(Dispatch);
+        }
+
+        public void Send(BufferStream buffer)
+        {
+            _client.Send(buffer.Memory);
         }
 
         public void AddTask(Func<WebsocketClient, bool> task, int sleepTime)
