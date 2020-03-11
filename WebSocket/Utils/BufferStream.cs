@@ -454,16 +454,17 @@ namespace WebSocket.Utils
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void Read(out string value)
         {
-            StringBuilder str = new StringBuilder();
+            int index = 1;
+            int startIt = iterator;
 
             for (char c = '\0'; iterator < length;)
             {
                 c = (char)memory[iterator++];
+                index++;
                 if (c == '\0') break;
-                str.Append(c);
             }
 
-            value = str.ToString();
+            value = Encoding.UTF8.GetString(memory, startIt, index - 1);
             iterator = (iterator + fastAlign) & fastAlignNot;
         }
 
