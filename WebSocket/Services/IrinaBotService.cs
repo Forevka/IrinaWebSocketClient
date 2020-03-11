@@ -1,29 +1,55 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Websocket.Client;
 using Websocket.Client.Models;
 using WebSocket.Abstractions;
 using WebSocket.Enums;
-using WebSocket.Models;
 using WebSocket.Utils;
 
 namespace WebSocket.Services
 {
-    class IrinaBotService : IIrinaBotService
+    class IrinaBotService: IIrinaBotService
     {
         private readonly WebsocketClient _client;
         private readonly ManualResetEvent _resetEvent;
 
-        public IrinaBotService()
+        private readonly Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>> _handlersDefaultContext;
+        private readonly Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>> _handlersGlobalContext;
+
+        public IrinaBotService(string webSocketUrl)
         {
-            _client = new WebsocketClient(new Uri("wss://irinabot.ru/ghost/"));
+            _client = new WebsocketClient(new Uri(webSocketUrl));
             _resetEvent = new ManualResetEvent(false);
+
+            _handlersDefaultContext = new Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>>();
+            _handlersGlobalContext = new Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>>();
 
             _client.ReconnectTimeout = TimeSpan.FromSeconds(30);
             _client.ReconnectionHappened.Subscribe(ReconnectHandler);
             _client.MessageReceived.Subscribe(Dispatch);
+        }
+
+        public void AddHandler(DefaultContext contextHeader, Func<BufferStream, WebsocketClient, Dictionary<string, object>> handler)
+        {
+            if (!_handlersDefaultContext.TryGetValue(contextHeader, out var hList))
+            {
+                hList = new List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>();
+                _handlersDefaultContext.Add(contextHeader, hList);
+            }
+
+            hList.Add(handler);
+        }
+
+        public void AddHandler(GlobalContext contextHeader, Func<BufferStream, WebsocketClient, Dictionary<string, object>> handler)
+        {
+            if (!_handlersGlobalContext.TryGetValue(contextHeader, out var hList))
+            {
+                hList = new List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>();
+                _handlersGlobalContext.Add(contextHeader, hList);
+            }
+
+            hList.Add(handler);
         }
 
         public void Start()
@@ -43,114 +69,46 @@ namespace WebSocket.Services
 
             if (msg.Binary.Length <= 2) return;
 
-            stream.Read(out byte header);
             stream.Read(out byte context);
+            stream.Read(out byte header);
 
-            if (header == (byte)ContextType.DefaultContext)
+            switch (context)
             {
-                if (context == (byte)DefaultContext.NewMessage)
+                case (byte)ContextType.DefaultContext:
                 {
-                    HandleMessage(stream);
-                }
-                else if (context == (byte)DefaultContext.GameList)
-                {
-                    HandleGameList(stream);
-                }
-            }
-        }
-
-
-        private void HandleMessage(BufferStream stream)
-        {
-            Console.WriteLine("new chat message");
-            string chatMsg = "";
-            try
-            {
-                stream.Read(out string msgStr);
-                chatMsg += " " + msgStr;
-                stream.Read(out msgStr);
-                chatMsg += " " + msgStr;
-                stream.Read(out msgStr);
-                chatMsg += " " + msgStr;
-                stream.Read(out msgStr);
-                chatMsg += " " + msgStr;
-
-                Console.WriteLine(chatMsg);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                throw;
-            }
-        }
-
-        private void HandleGameList(BufferStream stream)
-        {
-            Console.WriteLine("game list");
-            stream.Read(out ushort gameCount);
-            Console.WriteLine(gameCount);
-
-            var gameList = new List<GameModel>();
-
-            for (int i = 0; i < gameCount; i++)
-            {
-                stream.Read(out sbyte started);
-                stream.Read(out string name);
-                stream.Read(out sbyte hasAdmin);
-                stream.Read(out sbyte hasPassword);
-                stream.Read(out sbyte hasGamePowerUp);
-                stream.Read(out int gameCounter);
-                stream.Read(out int gameTicks);
-                stream.Read(out string iccupHost);
-                stream.Read(out sbyte slotflsg);
-                stream.Read(out sbyte maxPlayers);
-                stream.Read(out sbyte playersCount);
-                var game = new GameModel
-                {
-                    Started = started,
-                    Name = name,
-                    GameCounter = gameCounter,
-                    GameTicks = gameTicks,
-                    HasAdmin = hasAdmin,
-                    HasGamePowerUp = hasGamePowerUp,
-                    HasPassword = hasPassword,
-                    IccupHost = iccupHost,
-                    MaxPlayers = maxPlayers,
-                    PlayersCount = playersCount,
-                    Slotflsg = slotflsg,
-                    Players = new List<GamePlayerModel>()
-                };
-
-
-                for (int j = 0; j < playersCount; j++)
-                {
-                    stream.Read(out sbyte color);
-                    stream.Read(out string pName);
-                    stream.Read(out string relam);
-                    stream.Read(out string comment);
-                    var player = new GamePlayerModel
+                    if (_handlersDefaultContext.TryGetValue((DefaultContext)header, out var hList))
                     {
-                        Color = color, 
-                        Comment = comment,
-                        Name = pName, 
-                        Relam = relam
-                    };
+                        foreach (var handler in hList)
+                        {
+                            var res = handler.Invoke(stream, _client);
+                        }
 
-                    game.Players.Add(player);
+                        return;
+                    }
+
+                    Console.WriteLine($"Error! cant find handlers for: {header}");
+
+                    return;
                 }
-                gameList.Add(game);
-            }
-
-            foreach (var game in gameList.Where(x => x.Started == 0))
-            {
-                Console.WriteLine("Game:" + game.Name);
-                Console.WriteLine("Started:" + game.Started);
-                Console.WriteLine("HasPassword:" + game.HasPassword);
-                Console.WriteLine("Tick:" + game.GameTicks);
-                Console.WriteLine("Counter:" + game.GameCounter);
-                foreach (var player in game.Players)
+                case (byte)ContextType.GlobalContext:
                 {
-                    Console.WriteLine("\tPlayer: " + player.Name);
+                    if (_handlersGlobalContext.TryGetValue((GlobalContext)header, out var hList))
+                    {
+                        foreach (var handler in hList)
+                        {
+                            var res = handler.Invoke(stream, _client);
+                        }
+                    }
+
+                    Console.WriteLine($"Error! cant find handlers for: {header}");
+
+                    return;
+                }
+                default:
+                {
+                    Console.WriteLine($"Error! Unknown context {context}!");
+
+                    return;
                 }
             }
         }
