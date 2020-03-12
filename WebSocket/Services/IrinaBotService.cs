@@ -5,6 +5,7 @@ using Websocket.Client;
 using Websocket.Client.Models;
 using WebSocket.Abstractions;
 using WebSocket.Enums;
+using WebSocket.Models;
 using WebSocket.Utils;
 
 namespace WebSocket.Services
@@ -14,20 +15,20 @@ namespace WebSocket.Services
         private readonly WebsocketClient _client;
         private readonly ManualResetEvent _resetEvent;
 
-        private readonly Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>> _handlersDefaultContext;
-        private readonly Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>> _handlersGlobalContext;
+        private readonly Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, HandlerWorkResult>>> _handlersDefaultContext;
+        private readonly Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, HandlerWorkResult>>> _handlersGlobalContext;
 
-        private readonly List<Thread> _tasks;
+        private readonly Dictionary<int, Tuple<CancellationTokenSource, Thread>> _tasks;
 
         public IrinaBotService(string webSocketUrl)
         {
             _client = new WebsocketClient(new Uri(webSocketUrl));
             _resetEvent = new ManualResetEvent(false);
 
-            _tasks = new List<Thread>();
+            _tasks = new Dictionary<int, Tuple<CancellationTokenSource, Thread>>();
 
-            _handlersDefaultContext = new Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>>();
-            _handlersGlobalContext = new Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>>();
+            _handlersDefaultContext = new Dictionary<DefaultContext, List<Func<BufferStream, WebsocketClient, HandlerWorkResult>>>();
+            _handlersGlobalContext = new Dictionary<GlobalContext, List<Func<BufferStream, WebsocketClient, HandlerWorkResult>>>();
 
             _client.ReconnectTimeout = TimeSpan.FromSeconds(30);
             _client.ReconnectionHappened.Subscribe(ReconnectHandler);
@@ -39,38 +40,51 @@ namespace WebSocket.Services
             _client.Send(buffer.Memory);
         }
 
-        public void AddTask(Func<WebsocketClient, bool> task, int sleepTime)
+        public int AddTask(Action<WebsocketClient> task, int sleepTime)
         {
-            var thread = new Thread(() => Task(task, sleepTime));
+            var cancelTokenSource = new CancellationTokenSource();
+            var cancelToken = cancelTokenSource.Token;
+            var taskId = _tasks.Count;
+
+            var thread = new Thread(() => Task(task, sleepTime, taskId, cancelToken));
             thread.Start();
-            _tasks.Add(thread);
+
+            _tasks.Add(taskId, new Tuple<CancellationTokenSource, Thread>(cancelTokenSource, thread));
+            return taskId;
         }
 
-        public bool Task(Func<WebsocketClient, bool> task, int sleepTime)
+        public void StopTask(int taskId)
         {
-            while (true)
+            if (_tasks.TryGetValue(taskId, out var threadTuple))
+                if (!threadTuple.Item1.IsCancellationRequested)
+                    threadTuple.Item1.Cancel();
+        }
+
+        public void Task(Action<WebsocketClient> task, int sleepTime, int taskId, CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
             {
                 Thread.Sleep(sleepTime);
                 task.Invoke(_client);
             }
         }
 
-        public void AddHandler(DefaultContext contextHeader, Func<BufferStream, WebsocketClient, Dictionary<string, object>> handler)
+        public void AddHandler(DefaultContext contextHeader, Func<BufferStream, WebsocketClient, HandlerWorkResult> handler)
         {
             if (!_handlersDefaultContext.TryGetValue(contextHeader, out var hList))
             {
-                hList = new List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>();
+                hList = new List<Func<BufferStream, WebsocketClient, HandlerWorkResult>>();
                 _handlersDefaultContext.Add(contextHeader, hList);
             }
 
             hList.Add(handler);
         }
 
-        public void AddHandler(GlobalContext contextHeader, Func<BufferStream, WebsocketClient, Dictionary<string, object>> handler)
+        public void AddHandler(GlobalContext contextHeader, Func<BufferStream, WebsocketClient, HandlerWorkResult> handler)
         {
             if (!_handlersGlobalContext.TryGetValue(contextHeader, out var hList))
             {
-                hList = new List<Func<BufferStream, WebsocketClient, Dictionary<string, object>>>();
+                hList = new List<Func<BufferStream, WebsocketClient, HandlerWorkResult>>();
                 _handlersGlobalContext.Add(contextHeader, hList);
             }
 
@@ -79,8 +93,6 @@ namespace WebSocket.Services
 
         public void Start()
         {
-            //_client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetGameList });
-
             _client.Start();
 
             _resetEvent.WaitOne();

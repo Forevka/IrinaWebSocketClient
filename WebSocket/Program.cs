@@ -25,6 +25,7 @@ namespace WebSocket
 
     class Program
     {
+        private IrinaBotService _irka;
         static void Main()
         {
             var p = new Program();
@@ -35,23 +36,23 @@ namespace WebSocket
         {
             Console.OutputEncoding = Encoding.UTF8;
 
-            using (IrinaBotService irka = new IrinaBotService("wss://irinabot.ru/ghost/"))
+            using (_irka = new IrinaBotService("wss://irinabot.ru/ghost/"))
             {
-                irka.AddHandler(DefaultContext.NewMessage, HandleMessage);
-                irka.AddHandler(DefaultContext.GameList, HandleGameList);
-                irka.AddHandler(DefaultContext.WebSocketConnect, HandlePing);
-                irka.AddHandler(DefaultContext.MapInfo, HandleMapInfo);
+                _irka.AddHandler(DefaultContext.NewMessage, HandleMessage);
+                _irka.AddHandler(DefaultContext.GameList, HandleGameList);
+                _irka.AddHandler(DefaultContext.WebSocketConnect, HandlePing);
+                _irka.AddHandler(DefaultContext.MapInfo, HandleMapInfo);
 
-                irka.GetMapInfo(13682);
+                _irka.GetMapInfo(13682);
 
-                irka.AddTask(GetGameList, 2000);
-                irka.AddTask(Ping, 2000);
+                _irka.AddTask(GetGameList, 2000);
+                _irka.AddTask(Ping, 2000);
 
-                irka.Start();
+                _irka.Start();
             }
         }
 
-        private Dictionary<string, object> HandleMapInfo(BufferStream stream, WebsocketClient client)
+        private HandlerWorkResult HandleMapInfo(BufferStream stream, WebsocketClient client)
         {
             var map = new GameMapModel(stream);
 
@@ -59,32 +60,34 @@ namespace WebSocket
 
             Console.WriteLine("Map: " + map.Name + "Author: " + map.Author);
             
-            return new Dictionary<string, object>();
+            return new HandlerWorkResult()
+            {
+                IsOk = true,
+            };
         }
 
-        private bool GetGameList(WebsocketClient client)
+        private void GetGameList(WebsocketClient client)
         {
             client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetGameList });
-
-            return true;
         }
 
-        private bool Ping(WebsocketClient client)
+        private void Ping(WebsocketClient client)
         {
             client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetWebsocketConnect });
-
-            return true;
         }
 
-        private Dictionary<string, object> HandlePing(BufferStream stream, WebsocketClient client)
+        private HandlerWorkResult HandlePing(BufferStream stream, WebsocketClient client)
         {
             stream.Read(out int totalUsers);
             Console.WriteLine("Total users: " + totalUsers);
-
-            return new Dictionary<string, object>();
+            
+            return new HandlerWorkResult()
+            {
+                IsOk = true,
+            };
         }
 
-        private Dictionary<string, object> HandleMessage(BufferStream stream, WebsocketClient client)
+        private HandlerWorkResult HandleMessage(BufferStream stream, WebsocketClient client)
         {
             Console.WriteLine("new chat message");
             string chatMsg = "";
@@ -107,10 +110,13 @@ namespace WebSocket
                 throw;
             }
 
-            return new Dictionary<string, object>();
+            return new HandlerWorkResult()
+            {
+                IsOk = true,
+            };
         }
 
-        private Dictionary<string, object> HandleGameList(BufferStream stream, WebsocketClient client)
+        private HandlerWorkResult HandleGameList(BufferStream stream, WebsocketClient client)
         {
             stream.Read(out ushort gameCount);
             Console.WriteLine(gameCount);
@@ -124,7 +130,7 @@ namespace WebSocket
                 gameList.Add(game);
             }
 
-            foreach (var game in gameList.Where(x => x.Started == 1))
+            foreach (var game in gameList.Where(x => x.Started == 0))
             {
                 Console.WriteLine("Game:" + game.Name);
                 Console.WriteLine("Started:" + game.Started);
@@ -137,7 +143,10 @@ namespace WebSocket
                 }
             }
 
-            return new Dictionary<string, object>();
+            return new HandlerWorkResult()
+            {
+                IsOk = true,
+            };
         }
     }
 }
