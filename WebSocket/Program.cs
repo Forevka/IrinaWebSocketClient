@@ -46,7 +46,7 @@ namespace WebSocket
                 _irka.GetMapInfo(13682);
 
                 _irka.AddTask(GetGameList, 2000);
-                _irka.AddTask(Ping, 2000);
+                _irka.AddTask(GetUserCount, 2000);
 
                 _irka.Start();
             }
@@ -71,7 +71,7 @@ namespace WebSocket
             client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetGameList });
         }
 
-        private void Ping(WebsocketClient client)
+        private void GetUserCount(WebsocketClient client)
         {
             client.Send(new[] { (byte)ContextType.DefaultContext, (byte)DefaultContext.GetWebsocketConnect });
         }
