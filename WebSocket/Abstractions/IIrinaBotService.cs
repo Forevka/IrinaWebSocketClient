@@ -8,6 +8,8 @@ namespace WebSocket.Abstractions
 {
     public interface IIrinaBotService : IDisposable
     {
+        void AnonimAuth();
+        void Auth(string token);
         void StopTask(int taskId);
         int AddTask(Action<WebsocketClient> task, int sleepTime);
         void AddHandler(DefaultContext contextHeader, Func<BufferStream, WebsocketClient, HandlerWorkResult> handler);

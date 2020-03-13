@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Websocket.Client;
 using Websocket.Client.Models;
@@ -12,6 +13,8 @@ namespace WebSocket.Services
 {
     public class IrinaBotService: IIrinaBotService
     {
+        private static Random _random = new Random();
+
         private readonly WebsocketClient _client;
         private readonly ManualResetEvent _resetEvent;
 
@@ -123,7 +126,7 @@ namespace WebSocket.Services
                         return;
                     }
 
-                    Console.WriteLine($"Error! cant find handlers for: {header}");
+                    Console.WriteLine($"Error! cant find handlers for: {header} context {context}");
 
                     return;
                 }
@@ -135,9 +138,11 @@ namespace WebSocket.Services
                         {
                             var res = handler.Invoke(stream, _client);
                         }
+
+                        return;
                     }
 
-                    Console.WriteLine($"Error! cant find handlers for: {header}");
+                    Console.WriteLine($"Error! cant find handlers for: {header} context {context}");
 
                     return;
                 }
@@ -150,9 +155,45 @@ namespace WebSocket.Services
             }
         }
 
+        public void SetConnectorName(string name)
+        {
+            var buffer = new BufferStream(2 + name.ToCharArray().Length * 2, 1);
+            buffer.Write((byte)ContextType.GlobalContext);
+            buffer.Write((byte)GlobalContext.SetConnectorName);
+            buffer.Write(name);
+
+            Send(buffer);
+        }
+
+        public void AnonimAuth()
+        {
+            var token = RandomString("Awmb2H3jYSo5u4XKR2meMbl30kU6ae".Length);
+            Auth(token);
+            SetConnectorName("qwerqwerqwer");
+        }
+
+        public void Auth(string token)
+        {
+            var buffer = new BufferStream(1024, 1);
+            buffer.Write((byte)ContextType.GlobalContext);
+            buffer.Write((byte)GlobalContext.UserAuth);
+            buffer.Write((byte)1); //discord
+            buffer.Write((byte)0);
+            buffer.Write(token);
+
+            Send(buffer);
+        }
+
         private void ReconnectHandler(ReconnectionInfo info)
         {
             Console.WriteLine($"Reconnection happened, type: {info.Type}");
+        }
+
+        public static string RandomString(int length)
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            return new string(Enumerable.Repeat(chars, length)
+                .Select(s => s[_random.Next(s.Length)]).ToArray());
         }
 
         public void Dispose()
